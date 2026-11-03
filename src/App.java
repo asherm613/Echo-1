@@ -58,8 +58,12 @@ public class App {
             input = scan.nextLine();
             if (input.equals("y") || input.equals("Y")) {
                 state = true;
-            } else {
+            } 
+            else if (input.equals("n") || input.equals("N")) {
                 state = false;
+            }
+            else {
+                System.out.println("Invalid input. Please enter 'y' or 'n'.");
             }
         }
         if (finalanswer < 0.0001){
