@@ -10,13 +10,21 @@ public class App {
         while (state) {
             Scanner scan = new Scanner(System.in);
             System.out.println("Enter object length in meters");
-            double length= scan.nextDouble();     // meters
+            double length = scan.nextDouble();     // meters
             System.out.println("Enter object width in meters");
             double width = scan.nextDouble();      // meters
             System.out.println("Enter Elevation angle");
             double thetaDeg = scan.nextDouble();     // degrees
+            if (thetaDeg < 0 || thetaDeg > 90) {
+                System.out.println("Elevation angle must be between 0 and 90 degrees.");
+                thetaDeg = scan.nextDouble(); // Prompt again for a valid angle
+            }
             System.out.println("Enter Azimuth angle");
             double phiDeg = scan.nextDouble();       // degrees
+            if (phiDeg < 0 || phiDeg > 360) {
+                System.out.println("Azimuth angle must be between 0 and 360 degrees.");
+                phiDeg = scan.nextDouble(); // Prompt again for a valid angle
+            }
             System.out.println("Enter radar wavelength in meters");
             double lambda = scan.nextDouble();    // meters 
 
