@@ -9,9 +9,9 @@ public class App {
             boolean state = true;
         while (state) {
             Scanner scan = new Scanner(System.in);
-            System.out.println("Enter object length");
+            System.out.println("Enter object length in meters");
             double length= scan.nextDouble();     // meters
-            System.out.println("Enter object width");
+            System.out.println("Enter object width in meters");
             double width = scan.nextDouble();      // meters
             System.out.println("Enter Elevation angle");
             double thetaDeg = scan.nextDouble();     // degrees
