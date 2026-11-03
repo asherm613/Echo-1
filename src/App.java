@@ -55,10 +55,10 @@ public class App {
             }
         }
         if (finalanswer < 0.003) {
-            System.out.println("Object is stealthier than the F117 Night Hawk\nYou've got a true hopless diamond");
+            System.out.println("Object is stealthier than the F117 Night Hawk\nYou've got a truly hopless diamond");
         } 
         else if (finalanswer < 0.0001){
-            System.out.println("Object is stealthier than the F22 Raptor and F35 Lightning II");
+            System.out.println("Object is stealthier than the F22 Raptor and the F35 Lightning II");
         }
         else if (finalanswer < 0.1){
             System.out.println("Object is stealthier than the B2 Spirit");
