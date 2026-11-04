@@ -28,6 +28,27 @@ public class Triangle {
         return a.cross(b);
     }
 
+    public Vector3 vertex(int index) {
+        if (index == 0) {
+            return v1;
+        }
+        if (index == 1) {
+            return v2;
+        }
+        if (index == 2) {
+            return v3;
+        }
+        throw new IndexOutOfBoundsException("Triangle vertex index must be 0, 1, or 2.");
+    }
+
+    public Vector3 centroid() {
+        return new Vector3(
+            (v1.x + v2.x + v3.x) / 3.0,
+            (v1.y + v2.y + v3.y) / 3.0,
+            (v1.z + v2.z + v3.z) / 3.0
+        );
+    }
+
     public Vector3 minimum() {
         return new Vector3(
             Math.min(v1.x, Math.min(v2.x, v3.x)),

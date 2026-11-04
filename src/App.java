@@ -1,4 +1,3 @@
-import java.io.IOException;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Scanner;
@@ -59,43 +58,18 @@ public class App {
         }
         radarDirection = radarDirection.normalize();
 
-        double projectedArea = calculateProjectedArea(mesh, radarDirection, metersPerUnit);
-        double totalRCS = calculateRcs(projectedArea, lambda);
+        double totalRCS = PhysicalOpticsRcs.estimate(
+            mesh, lambda, metersPerUnit, radarDirection);
 
-        System.out.printf("Projected area estimate: %.6g m²%n", projectedArea);
-        System.out.println("RCS model: flat-plate approximation, 4 * pi * area^2 / wavelength^2.");
-        System.out.println("This rough estimate assumes a closed, consistently modeled surface; "
-            + "it does not model shadowing, phase cancellation, edges, or material.");
+        System.out.println("RCS model: ideal-conductor physical-optics estimate.");
+        System.out.println("It includes coherent facet phase and approximate shadowing, "
+            + "but not diffraction, polarization, material, or multiple reflections.");
+        System.out.println("RCS accuracy depends on mesh quality and radar conditions; "
+            + "this is not a guaranteed-accuracy full-wave calculation.");
         printAircraftComparison(totalRCS);
         System.out.println("These are rough threshold comparisons, not validated measurements of aircraft RCS.");
         System.out.printf("RCS result (rough estimate): %.6g m²%n", totalRCS);
         scan.close();
-    }
-
-    private static double calculateProjectedArea(ArrayList<Triangle> mesh,
-                                                 Vector3 radarDirection,
-                                                 double metersPerUnit) {
-        double projectedArea = 0.0;
-
-        for (Triangle triangle : mesh) {
-            double triangleArea = triangle.area();
-            Vector3 normal = triangle.normal();
-            double normalLength = normal.magnitude();
-
-            if (triangleArea > 0.0 && normalLength > 0.0) {
-                double facingAmount = Math.abs(normal.dot(radarDirection) / normalLength);
-                double areaInSquareMeters = triangleArea * metersPerUnit * metersPerUnit;
-                projectedArea += areaInSquareMeters * facingAmount;
-            }
-        }
-
-        // A closed surface is counted from both sides, so divide the sum by two.
-        return projectedArea / 2.0;
-    }
-
-    private static double calculateRcs(double projectedArea, double wavelength) {
-        return 4.0 * Math.PI * projectedArea * projectedArea
-            / (wavelength * wavelength);
     }
 
     private static void printAircraftComparison(double rcs) {
