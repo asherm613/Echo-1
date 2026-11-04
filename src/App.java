@@ -1,82 +1,172 @@
-import java.util.Scanner;
+import java.io.IOException;
+import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Scanner;
+
 public class App {
+
     public static void main(String[] args) throws Exception {
-        ArrayList<Double> rcsval = new ArrayList<>();
-            double theta;
-            double phi;
-            double finalanswer = 0.0;
-            boolean state = true;
-        while (state) {
-            Scanner scan = new Scanner(System.in);
-            System.out.println("Enter object length in meters");
-            double length = scan.nextDouble();     // meters
-            System.out.println("Enter object width in meters");
-            double width = scan.nextDouble();      // meters
-            System.out.println("Enter Elevation angle");
-            double thetaDeg = scan.nextDouble();     // degrees
-            if (thetaDeg < 0 || thetaDeg > 90) {
-                System.out.println("Elevation angle must be between 0 and 90 degrees.");
-                thetaDeg = scan.nextDouble(); // Prompt again for a valid angle
-            }
-            System.out.println("Enter Azimuth angle");
-            double phiDeg = scan.nextDouble();       // degrees
-            if (phiDeg < 0 || phiDeg > 360) {
-                System.out.println("Azimuth angle must be between 0 and 360 degrees.");
-                phiDeg = scan.nextDouble(); // Prompt again for a valid angle
-            }
-            System.out.println("Enter radar wavelength in meters");
-            double lambda = scan.nextDouble();    // meters 
+        Scanner scan = new Scanner(System.in);
 
-            theta = Math.toRadians(thetaDeg);
-            phi = Math.toRadians(phiDeg);
+        System.out.println("Please insert file path to STL file:");
+        String path = scan.nextLine();
 
-            double x = (2.0 * Math.PI * length / lambda)
-                    * Math.sin(theta)
-                    * Math.cos(phi);
+        ArrayList<Triangle> mesh = loadStl(new File(path));
 
-            double y = (2.0 * Math.PI * width / lambda)
-                    * Math.sin(phi);
+        System.out.println("Triangles loaded: " + mesh.size());
 
-            // sinc(z) = sin(z)/z, handle z=0
-            double sincX = (Math.abs(x) < 1e-10) ? 1.0 : Math.sin(x) / x;
-            double sincY = (Math.abs(y) < 1e-10) ? 1.0 : Math.sin(y) / y;
-
-            double rcs =
-                    (4.0 * Math.PI * length * length * width * width)
-                    / (lambda * lambda)
-                    * Math.pow(Math.cos(theta), 2)
-                    * Math.pow(sincX, 2)
-                    * Math.pow(sincY, 2);
-                rcsval.add(rcs);
-            for (double w = 0.0; w < rcsval.size(); w++) {
-                finalanswer += rcsval.get((int) w);
-            }
-            System.out.println("RCS = " + finalanswer + " m²");
-            System.out.print("Continue? (y/n): ");
-            String input = scan.nextLine();
-            input = scan.nextLine();
-            if (input.equals("y") || input.equals("Y")) {
-                state = true;
-            } 
-            else if (input.equals("n") || input.equals("N")) {
-                state = false;
-            }
-            else {
-                System.out.println("Invalid input. Please enter 'y' or 'n'.");
-            }
+        if (mesh.isEmpty()) {
+            System.out.println("No valid triangles were found in the STL file.");
+            scan.close();
+            return;
         }
-        if (finalanswer < 0.0001){
-            System.out.println("Object is stealthier than the F22 Raptor and the F35 Lightning II");
+
+        System.out.println("Please insert radar wavelength in meters:");
+        double lambda = scan.nextDouble();
+        scan.nextLine();
+
+        if (lambda <= 0.0) {
+            throw new IllegalArgumentException("Radar wavelength must be greater than zero.");
         }
-        else if (finalanswer < 0.003) {
-            System.out.println("Object is stealthier than the F117 Night Hawk\nYou've got a truly hopeless diamond");
-        } 
-        else if (finalanswer < 0.1){
-            System.out.println("Object is stealthier than the B2 Spirit");
+
+        Vector3 radarDirection = new Vector3(1, 0, 0).normalize();
+        double totalRCS = 0.0;
+
+        for (Triangle tri : mesh) {
+            double area = tri.area();
+            if (area <= 1e-12) {
+                continue;
+            }
+
+            Vector3 normal = tri.normal();
+            double normalMagnitude = normal.magnitude();
+            if (normalMagnitude <= 1e-12) {
+                continue;
+            }
+
+            double cosTheta = Math.abs(normal.dot(radarDirection) / normalMagnitude);
+            cosTheta = Math.max(0.0, Math.min(1.0, cosTheta));
+
+            double triangleRCS =
+                (4.0 * Math.PI
+                * area * area
+                / (lambda * lambda))
+                * cosTheta * cosTheta;
+
+            totalRCS += triangleRCS;
         }
-        else {
+
+        System.out.println("RCS = " + totalRCS + " m²");
+        scan.close();
+
+        if (totalRCS < 0.0001) {
+            System.out.println("Object is stealthier than the F-22 Raptor and the F-35 Lightning II");
+        } else if (totalRCS < 0.003) {
+            System.out.println("Object is stealthier than the F-117 Nighthawk");
+        } else if (totalRCS < 0.1) {
+            System.out.println("Object is stealthier than the B-2 Spirit");
+        } else {
             System.out.println("Object is not stealthy");
         }
     }
-}
+
+    private static ArrayList<Triangle> loadStl(File file) throws IOException {
+        byte[] data = Files.readAllBytes(file.toPath());
+
+        if (isBinaryStl(data)) {
+            return parseBinaryStl(data);
+        }
+
+        return parseAsciiStl(data);
+    }
+
+    private static boolean isBinaryStl(byte[] data) {
+        if (data.length < 84) {
+            return false;
+        }
+
+        ByteBuffer header = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        long triangleCount = Integer.toUnsignedLong(header.getInt(80));
+        return 84L + 50L * triangleCount == data.length;
+    }
+
+    private static ArrayList<Triangle> parseBinaryStl(byte[] data) throws IOException {
+        ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        long triangleCount = Integer.toUnsignedLong(buffer.getInt(80));
+        ArrayList<Triangle> triangles = new ArrayList<>((int) triangleCount);
+
+        buffer.position(84);
+        for (long i = 0; i < triangleCount; i++) {
+            buffer.position(buffer.position() + 12); // Skip the stored facet normal.
+            Vector3 v1 = readBinaryVertex(buffer);
+            Vector3 v2 = readBinaryVertex(buffer);
+            Vector3 v3 = readBinaryVertex(buffer);
+            triangles.add(new Triangle(v1, v2, v3));
+            buffer.position(buffer.position() + 2); // Skip the attribute byte count.
+        }
+
+        return triangles;
+    }
+
+    private static Vector3 readBinaryVertex(ByteBuffer buffer) throws IOException {
+        double x = buffer.getFloat();
+        double y = buffer.getFloat();
+        double z = buffer.getFloat();
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+            throw new IOException("STL contains a non-finite vertex coordinate.");
+        }
+        return new Vector3(x, y, z);
+    }
+
+    private static ArrayList<Triangle> parseAsciiStl(byte[] data) throws IOException {
+        ArrayList<Triangle> triangles = new ArrayList<>();
+        ArrayList<Vector3> vertices = new ArrayList<>(3);
+
+        try (Scanner stl = new Scanner(new String(data, java.nio.charset.StandardCharsets.US_ASCII))) {
+            while (stl.hasNextLine()) {
+                String line = stl.nextLine().trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+
+                String[] parts = line.split("\\s+");
+                if (!parts[0].equalsIgnoreCase("vertex")) {
+                    continue;
+                }
+                if (parts.length != 4) {
+                    throw new IOException("Malformed vertex line in ASCII STL: " + line);
+                }
+
+                try {
+                    double x = Double.parseDouble(parts[1]);
+                    double y = Double.parseDouble(parts[2]);
+                    double z = Double.parseDouble(parts[3]);
+                    if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+                        throw new IOException("STL contains a non-finite vertex coordinate.");
+                    }
+                    vertices.add(new Vector3(x, y, z));
+                } catch (NumberFormatException e) {
+                    throw new IOException("Malformed vertex coordinates in ASCII STL: " + line, e);
+                }
+
+                if (vertices.size() == 3) {
+                    triangles.add(new Triangle(vertices.get(0), vertices.get(1), vertices.get(2)));
+                    vertices.clear();
+                }
+            }
+        }
+
+        if (!vertices.isEmpty()) {
+            throw new IOException("ASCII STL ended with an incomplete triangle.");
+        }
+        if (triangles.isEmpty()) {
+            throw new IOException("No triangles were found. The file is not a readable ASCII or binary STL.");
+        }
+
+        return triangles;
+        }
+    }
+    
