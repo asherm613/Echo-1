@@ -7,13 +7,25 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 public class App {
-
+    public static String removeChar(String input, String target) {
+        int x;
+        for (x = 0; x < input.length(); x++) {
+        if (input.substring(x, x+1).equals(target))
+            return input.substring(0 , x) + input.substring(x+1);
+        }
+        return input;
+        }
     public static void main(String[] args) throws Exception {
         Scanner scan = new Scanner(System.in);
-
+        String path;
         System.out.println("Please insert file path to STL file:");
-        String path = scan.nextLine();
-
+        String filepath = scan.nextLine();
+        if (filepath.startsWith("\"") && filepath.endsWith("\"")) {
+            path = filepath.substring(1, filepath.length() - 1);
+        }
+        else {
+            path = filepath;
+        }
         ArrayList<Triangle> mesh = loadStl(new File(path));
 
         System.out.println("Triangles loaded: " + mesh.size());
@@ -169,4 +181,3 @@ public class App {
         return triangles;
         }
     }
-    
