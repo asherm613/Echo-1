@@ -27,4 +27,12 @@ public class Triangle {
 
         return a.cross(b);
     }
+
+    public Vector3 centroid() {
+        return new Vector3(
+            (v1.x + v2.x + v3.x) / 3.0,
+            (v1.y + v2.y + v3.y) / 3.0,
+            (v1.z + v2.z + v3.z) / 3.0
+        );
+    }
 }

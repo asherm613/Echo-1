@@ -36,16 +36,25 @@ public class App {
             return;
         }
 
+        System.out.println("Please insert meters per STL coordinate unit:");
+        double metersPerUnit = scan.nextDouble();
+        scan.nextLine();
+
+        if (!Double.isFinite(metersPerUnit) || metersPerUnit <= 0.0) {
+            throw new IllegalArgumentException("STL scale must be a finite value greater than zero.");
+        }
+
         System.out.println("Please insert radar wavelength in meters:");
         double lambda = scan.nextDouble();
         scan.nextLine();
 
-        if (lambda <= 0.0) {
+        if (!Double.isFinite(lambda) || lambda <= 0.0) {
             throw new IllegalArgumentException("Radar wavelength must be greater than zero.");
         }
 
         Vector3 radarDirection = new Vector3(1, 0, 0).normalize();
-        double totalRCS = 0.0;
+        double scatteringReal = 0.0;
+        double scatteringImaginary = 0.0;
 
         for (Triangle tri : mesh) {
             double area = tri.area();
@@ -59,30 +68,31 @@ public class App {
                 continue;
             }
 
-            double cosTheta = Math.abs(normal.dot(radarDirection) / normalMagnitude);
+            double cosTheta = normal.dot(radarDirection) / normalMagnitude;
             cosTheta = Math.max(0.0, Math.min(1.0, cosTheta));
+            if (cosTheta == 0.0) {
+                continue;
+            }
 
-            double triangleRCS =
-                (4.0 * Math.PI
-                * area * area
-                / (lambda * lambda))
-                * cosTheta * cosTheta;
+            double projectedArea = area * metersPerUnit * metersPerUnit * cosTheta;
+            double phase = (4.0 * Math.PI / lambda)
+                * (metersPerUnit * tri.centroid().dot(radarDirection));
 
-            totalRCS += triangleRCS;
+            scatteringReal += projectedArea * Math.cos(phase);
+            scatteringImaginary += projectedArea * Math.sin(phase);
         }
 
-        System.out.println("RCS = " + totalRCS + " m²");
+        double totalRCS = (4.0 * Math.PI / (lambda * lambda))
+            * (scatteringReal * scatteringReal
+                + scatteringImaginary * scatteringImaginary);
+
+        System.out.println("Approximate RCS = " + totalRCS + " m²");
+        System.out.println("Assumptions: STL scale is " + metersPerUnit
+            + " meters per coordinate unit; radar direction is +X.");
+        System.out.println("This coherent facet estimate assumes an ideal conductor and "
+            + "does not account for polarization, material, or occlusion. "
+            + "Facet-centroid phase is approximate, especially for coarse meshes.");
         scan.close();
-
-        if (totalRCS < 0.0001) {
-            System.out.println("Object is stealthier than the F-22 Raptor and the F-35 Lightning II");
-        } else if (totalRCS < 0.003) {
-            System.out.println("Object is stealthier than the F-117 Nighthawk");
-        } else if (totalRCS < 0.1) {
-            System.out.println("Object is stealthier than the B-2 Spirit");
-        } else {
-            System.out.println("Object is not stealthy");
-        }
     }
 
     private static ArrayList<Triangle> loadStl(File file) throws IOException {
